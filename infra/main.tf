@@ -30,3 +30,12 @@ module "db" {
   db_user       = var.db_user
   db_password   = var.db_password
 }
+
+module "uploads_bucket" {
+  source            = "./modules/cloud_storage"
+  project_id        = var.project_id
+  bucket_name       = var.bucket_name
+  location          = var.region
+  public_access     = var.bucket_public_access
+  enable_versioning = var.bucket_versioning
+}

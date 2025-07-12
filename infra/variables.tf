@@ -35,3 +35,14 @@ variable "db_user" {
 variable "db_password" {
   sensitive = true
 }
+
+variable "bucket_name" {
+  default = "spider-107124046-uploads-bucket"
+}
+variable "bucket_public_access" {
+  default = false
+}
+variable "bucket_versioning" {
+  default = true
+}
+
