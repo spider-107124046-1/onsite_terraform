@@ -53,12 +53,12 @@ pipeline {
                   }
                 }
               """
-              writeFile file: "infra/envs/${env.BRANCH_NAME}.tfvars", text: tfvars
-              env.TF_VAR_FILE = "infra/envs/${env.BRANCH_NAME}.tfvars"
+              writeFile file: "envs/${env.BRANCH_NAME}.tfvars", text: tfvars
+              env.TF_VAR_FILE = "envs/${env.BRANCH_NAME}.tfvars"
             } else {
               withCredentials([file(credentialsId: 'terraform-staging-tfvars', variable: 'TFVARS_FILE')]) {
-                sh 'cp "$TFVARS_FILE" infra/envs/staging.tfvars'
-                env.TF_VAR_FILE = 'infra/envs/staging.tfvars'
+                sh 'cp "$TFVARS_FILE" envs/staging.tfvars'
+                env.TF_VAR_FILE = 'envs/staging.tfvars'
               }
             }
           }
