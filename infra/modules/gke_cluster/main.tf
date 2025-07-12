@@ -29,6 +29,8 @@ resource "google_container_node_pool" "primary_nodes" {
 
   node_config {
     machine_type = var.node_machine_type
+    disk_type    = "pd-standard"
+    disk_size_gb = 30
     tags         = ["allow-ssh"]
 
     oauth_scopes = [

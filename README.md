@@ -8,7 +8,7 @@
 - Enabled APIs:
   - Compute Engine API
   - Kubernetes Engine API
-  - Cloud SQL API
+  - Cloud SQL Admin API
   - Secret Manager API
   - IAM API
   - Cloud Storage API

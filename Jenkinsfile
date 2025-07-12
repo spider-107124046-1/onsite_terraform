@@ -1,14 +1,9 @@
 pipeline {
-  agent {
-    docker {
-      image 'hashicorp/terraform:latest'
-      args '-u root:root' // Run as root to avoid permission issues
-    }
-  }
+  agent { node { label 'docker' } }
 
   environment {
     TF_IN_AUTOMATION = 'true'
-    GOOGLE_APPLICATION_CREDENTIALS = credentials('gcp-spider-service-account') // from Jenkins credentials
+    GOOGLE_APPLICATION_CREDENTIALS = credentials('gcp-spider-service-account')
   }
 
   options {
@@ -18,7 +13,7 @@ pipeline {
 
   triggers {
     githubPush()
-    // pollSCM('H/5 * * * *') // Uncomment for polling
+    // pollSCM('H/5 * * * *')
   }
 
   parameters {
@@ -57,15 +52,12 @@ pipeline {
                 }
               }
             """
-            writeFile file: "envs/${env.BRANCH_NAME}.tfvars", text: tfvars
-            env.TF_VAR_FILE = "envs/${env.BRANCH_NAME}.tfvars"
+            writeFile file: "infra/envs/${env.BRANCH_NAME}.tfvars", text: tfvars
+            env.TF_VAR_FILE = "infra/envs/${env.BRANCH_NAME}.tfvars"
           } else {
-            // Use Jenkins secret file for staging/prod/dev
             withCredentials([file(credentialsId: 'terraform-staging-tfvars', variable: 'TFVARS_FILE')]) {
-              sh '''
-                cp "$TFVARS_FILE" envs/staging.tfvars
-              '''
-              env.TF_VAR_FILE = 'envs/staging.tfvars'
+              sh 'cp "$TFVARS_FILE" infra/envs/staging.tfvars'
+              env.TF_VAR_FILE = 'infra/envs/staging.tfvars'
             }
           }
         }
@@ -73,6 +65,13 @@ pipeline {
     }
 
     stage('Terraform Init') {
+      agent {
+        docker {
+          image 'hashicorp/terraform:latest'
+          args '-u root:root'
+          reuseNode true
+        }
+      }
       steps {
         dir('infra') {
           sh 'terraform init'
@@ -81,6 +80,13 @@ pipeline {
     }
 
     stage('Set Terraform Workspace') {
+      agent {
+        docker {
+          image 'hashicorp/terraform:latest'
+          args '-u root:root'
+          reuseNode true
+        }
+      }
       steps {
         dir('infra') {
           script {
@@ -95,12 +101,16 @@ pipeline {
     }
 
     stage('Terraform Plan') {
+      agent {
+        docker {
+          image 'hashicorp/terraform:latest'
+          args '-u root:root'
+          reuseNode true
+        }
+      }
       steps {
         dir('infra') {
-          script {
-            def tfvarsFile = env.TF_VAR_FILE
-            sh "terraform plan -var-file=${tfvarsFile} -out=tfplan.out"
-          }
+          sh "terraform plan -var-file=${env.TF_VAR_FILE} -out=tfplan.out"
         }
       }
     }
@@ -120,7 +130,14 @@ pipeline {
         anyOf {
           branch 'develop'
           branch 'main'
-          expression { params.AUTO_APPROVE }
+          expression { return params.AUTO_APPROVE }
+        }
+      }
+      agent {
+        docker {
+          image 'hashicorp/terraform:latest'
+          args '-u root:root'
+          reuseNode true
         }
       }
       steps {
@@ -136,11 +153,18 @@ pipeline {
           branch 'main'
         }
       }
+      agent {
+        docker {
+          image 'hashicorp/terraform:latest'
+          args '-u root:root'
+          reuseNode true
+        }
+      }
       steps {
         dir('infra') {
           script {
             if (env.BRANCH_NAME.startsWith('feature/') || env.CHANGE_BRANCH) {
-              sh 'terraform destroy -auto-approve -var-file=staging.tfvars'
+              sh "terraform destroy -auto-approve -var-file=${env.TF_VAR_FILE}"
             }
           }
         }
@@ -152,8 +176,11 @@ pipeline {
     always {
       echo "Cleaning up Terraform workspace"
       dir('infra') {
-        sh 'terraform workspace select default'
-        sh 'terraform workspace delete "${BRANCH_NAME}" || true'
+        script {
+          def ws = env.BRANCH_NAME ? env.BRANCH_NAME.replaceAll('/', '-') : 'default'
+          sh 'terraform workspace select default || true'
+          sh "terraform workspace delete ${ws} || true"
+        }
       }
     }
     failure {

@@ -7,6 +7,9 @@ variable "database_version" {
 variable "tier" {
   default = "db-f1-micro" # cheapest tier (shared core)
 }
+variable "edition" {
+  default = "ENTERPRISE"
+}
 variable "db_name" {}
 variable "db_user" {}
 variable "db_password" {}

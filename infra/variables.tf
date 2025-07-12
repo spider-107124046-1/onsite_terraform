@@ -29,12 +29,6 @@ variable "db_instance_name" {
 variable "db_name" {
   default = "classroom"
 }
-variable "db_user" {
-  default = "CR_auth"
-}
-variable "db_password" {
-  sensitive = true
-}
 
 variable "buckets" {
   type = map(object({
