@@ -5,8 +5,10 @@ variable "location" {
 }
 variable "public_access" {
   description = "Whether the bucket should be publicly readable"
+  type        = bool
   default     = false
 }
 variable "enable_versioning" {
+  type    = bool
   default = false
 }

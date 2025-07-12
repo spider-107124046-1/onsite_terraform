@@ -27,8 +27,8 @@ module "db" {
 
   instance_name = var.db_instance_name
   db_name       = var.db_name
-  db_user       = var.db_user
-  db_password   = var.db_password
+  db_user       = local.db_user
+  db_password   = local.db_password
 }
 
 module "buckets" {
