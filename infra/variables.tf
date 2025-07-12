@@ -1,6 +1,9 @@
 variable "project_id" {}
 variable "region" {
-  default = "asia-south1"
+  default = "us-central1"
+}
+variable "zone" {
+  default = "us-central1-a"
 }
 variable "cluster_name" {
   default = "spider-web-107124046"

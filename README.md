@@ -93,6 +93,10 @@ infra/
 
 ## Terraform Usage
 
+### Prerequisites
+
+The environment variable `GOOGLE_APPLICATION_CREDENTIALS` must be set to the account key json file obtained from the [Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts) page in GCP Console.
+
 ### Initialize Terraform
 
 Inside the `infra` folder,

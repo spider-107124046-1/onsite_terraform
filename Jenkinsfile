@@ -4,6 +4,7 @@ pipeline {
   environment {
     TF_IN_AUTOMATION = 'true'
     GOOGLE_APPLICATION_CREDENTIALS = credentials('gcp-spider-service-account')
+    def safeBranchName = env.BRANCH_NAME.replaceAll('/', '-')
   }
 
   options {
@@ -53,13 +54,9 @@ pipeline {
                   }
                 }
               """
-              writeFile file: "envs/${env.BRANCH_NAME}.tfvars", text: tfvars
-              env.TF_VAR_FILE = "envs/${env.BRANCH_NAME}.tfvars"
-            } else {
-              withCredentials([file(credentialsId: 'terraform-staging-tfvars', variable: 'TFVARS_FILE')]) {
-                sh 'cp "$TFVARS_FILE" envs/staging.tfvars'
-                env.TF_VAR_FILE = 'envs/staging.tfvars'
-              }
+              env.SAFE_BRANCH_NAME = env.BRANCH_NAME.replaceAll('/', '-')
+              writeFile file: "envs/${env.SAFE_BRANCH_NAME}.tfvars", text: tfvars
+              env.TFVARS_FILE = "envs/${env.SAFE_BRANCH_NAME}.tfvars"
             }
           }
         }
@@ -78,11 +75,9 @@ pipeline {
       steps {
         dir('infra') {
           script {
-            def workName = env.BRANCH_NAME ? env.BRANCH_NAME.replaceAll('/', '-') : 'default'
-            sh """
-              terraform workspace new "${workName}" || terraform workspace select "${workName}"
-              terraform workspace show
-            """
+            def workName = env.SAFE_BRANCH_NAME ? env.SAFE_BRANCH_NAME : 'default'
+            sh "terraform workspace new '${workName}' || terraform workspace select '${workName}'"
+            sh "terraform workspace show"
           }
         }
       }
@@ -91,7 +86,16 @@ pipeline {
     stage('Terraform Plan') {
       steps {
         dir('infra') {
-          sh "terraform plan -var-file=${env.TF_VAR_FILE} -out=tfplan.out"
+          script {
+            if (env.BRANCH_NAME.startsWith('feature/')) {
+              env.TFVARS_FILE = "envs/${env.SAFE_BRANCH_NAME}.tfvars"
+              sh "terraform plan -var-file=${env.TFVARS_FILE} -out=tfplan.out"
+            } else {
+              withCredentials([file(credentialsId: 'terraform-staging-tfvars', variable: 'TFVARS_FILE')]) {
+                sh "terraform plan -var-file=${env.TFVARS_FILE} -out=tfplan.out"
+              }
+            }
+          }
         }
       }
     }
@@ -131,7 +135,7 @@ pipeline {
         dir('infra') {
           script {
             if (env.BRANCH_NAME.startsWith('feature/') || env.CHANGE_BRANCH) {
-              sh "terraform destroy -auto-approve -var-file=${env.TF_VAR_FILE}"
+              sh "terraform destroy -auto-approve -var-file=${env.TFVARS_FILE}"
             }
           }
         }
@@ -144,7 +148,7 @@ pipeline {
       echo "Cleaning up Terraform workspace"
       dir('infra') {
         script {
-          def ws = env.BRANCH_NAME ? env.BRANCH_NAME.replaceAll('/', '-') : 'default'
+          def ws = env.SAFE_BRANCH_NAME ? env.SAFE_BRANCH_NAME : 'default'
           sh 'terraform workspace select default || true'
           sh "terraform workspace delete ${ws} || true"
         }
