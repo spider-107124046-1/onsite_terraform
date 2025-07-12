@@ -17,13 +17,8 @@ pipeline {
   }
 
   triggers {
-    // Trigger build via GitHub Webhook (preferred)
     githubPush()
-
-    // OR uncomment below for polling Git repo every 5 minutes
-    /*
-    pollSCM('H/5 * * * *')
-    */
+    // pollSCM('H/5 * * * *') // Uncomment for polling
   }
 
   parameters {
@@ -37,48 +32,41 @@ pipeline {
       }
     }
 
-    // TODO: Hashed names for buckets in feature branches. DO NOT CREATE feature/ BRANCHES UNTIL THEN
     stage('Setup tfvars for Respective Branches') {
-      when {
-        expression { return env.BRANCH_NAME.startsWith('feature/') }
-      }
       steps {
         script {
           if (env.BRANCH_NAME.startsWith('feature/')) {
             def tfvars = """
               project_id        = "spider-107124046-onsite"
               region            = "asia-south1"
-              cluster_name      = "spider-web-${BRANCH_NAME.replaceAll('/', '-')}"
+              cluster_name      = "spider-web-${env.BRANCH_NAME.replaceAll('/', '-')}"
               node_count        = 1
               node_machine_type = "e2-micro"
-              network_name      = "spider-web-${BRANCH_NAME.replaceAll('/', '-')}-vpc"
+              network_name      = "spider-web-${env.BRANCH_NAME.replaceAll('/', '-')}-vpc"
 
               subnets = [
                 {
-                  name          = "subnet-${BRANCH_NAME.replaceAll('/', '-')}"
+                  name          = "subnet-${env.BRANCH_NAME.replaceAll('/', '-')}"
                   ip_cidr_range = "10.40.0.0/16"
                 }
               ]
 
-              db_instance_name = "spider-db-${BRANCH_NAME.replaceAll('/', '-')}"
-              db_name          = "classroom_${BRANCH_NAME.replaceAll('/', '_')}"
+              db_instance_name = "spider-db-${env.BRANCH_NAME.replaceAll('/', '-')}"
+              db_name          = "classroom_${env.BRANCH_NAME.replaceAll('/', '_')}"
 
               ssh_allowed_ip_cidr = "0.0.0.0/0"
 
               buckets = {
-                "spider-${BRANCH_NAME.replaceAll('/', '-')}-uploads" = {
+                "spider-${env.BRANCH_NAME.replaceAll('/', '-')}-uploads" = {
                   public_access     = true
                   enable_versioning = false
                 }
               }
             """
-            writeFile file: "envs/${BRANCH_NAME}.tfvars", text: tfvars
-          }
-          // Use the appropriate tfvars file based on branch from Jenkins Credentials
-          if (env.BRANCH_NAME.startsWith('feature/')) {
-            env.TF_VAR_FILE = "envs/${BRANCH_NAME}.tfvars"
+            writeFile file: "envs/${env.BRANCH_NAME}.tfvars", text: tfvars
+            env.TF_VAR_FILE = "envs/${env.BRANCH_NAME}.tfvars"
           } else {
-            // Pull tfvars from Jenkins credentials for prod, staging and dev. USING ONLY STAGING FOR NOW
+            // Use Jenkins secret file for staging/prod/dev
             withCredentials([file(credentialsId: 'terraform-staging-tfvars', variable: 'TFVARS_FILE')]) {
               sh '''
                 cp "$TFVARS_FILE" envs/staging.tfvars
@@ -93,7 +81,6 @@ pipeline {
     stage('Terraform Init') {
       steps {
         dir('infra') {
-          // Initialize Terraform with backend configuration
           sh 'terraform init'
         }
       }
@@ -102,14 +89,12 @@ pipeline {
     stage('Set Terraform Workspace') {
       steps {
         dir('infra') {
-          // Create or select Terraform workspace based on branch name
           script {
-            env.WORK_NAME = env.BRANCH_NAME ?: 'default'
-            env.WORK_NAME = env.BRANCH_NAME.replaceAll('/', '-')
-            sh '''
-              terraform workspace new "${WORK_NAME}" || terraform workspace select "${WORK_NAME}"
+            def workName = env.BRANCH_NAME ? env.BRANCH_NAME.replaceAll('/', '-') : 'default'
+            sh """
+              terraform workspace new "${workName}" || terraform workspace select "${workName}"
               terraform workspace show
-            '''
+            """
           }
         }
       }
@@ -118,8 +103,10 @@ pipeline {
     stage('Terraform Plan') {
       steps {
         dir('infra') {
-          def tfvarsFile = env.TF_VAR_FILE
-          sh "terraform plan -var-file=${tfvarsFile} -out=tfplan.out"
+          script {
+            def tfvarsFile = env.TF_VAR_FILE
+            sh "terraform plan -var-file=${tfvarsFile} -out=tfplan.out"
+          }
         }
       }
     }
@@ -143,7 +130,9 @@ pipeline {
         }
       }
       steps {
-        sh 'terraform apply -auto-approve tfplan.out'
+        dir('infra') {
+          sh 'terraform apply -auto-approve tfplan.out'
+        }
       }
     }
 
@@ -154,9 +143,11 @@ pipeline {
         }
       }
       steps {
-        script {
-          if (env.BRANCH_NAME.startsWith('feature/') || env.CHANGE_BRANCH) {
-            sh 'terraform destroy -auto-approve -var-file=staging.tfvars'
+        dir('infra') {
+          script {
+            if (env.BRANCH_NAME.startsWith('feature/') || env.CHANGE_BRANCH) {
+              sh 'terraform destroy -auto-approve -var-file=staging.tfvars'
+            }
           }
         }
       }
@@ -166,10 +157,13 @@ pipeline {
   post {
     always {
       echo "Cleaning up Terraform workspace"
-      sh 'terraform workspace select default'
-      sh 'terraform workspace delete "${BRANCH_NAME}" || true'
+      dir('infra') {
+        sh 'terraform workspace select default'
+        sh 'terraform workspace delete "${BRANCH_NAME}" || true'
+      }
     }
     failure {
       echo 'Pipeline failed.'
     }
   }
+}
