@@ -38,3 +38,4 @@ infra/terraform-serviceacc-key.json
 
 # tfplan files
 *tfplan*
+infra/tfplan.out

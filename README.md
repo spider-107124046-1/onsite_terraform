@@ -95,7 +95,34 @@ infra/
 
 ### Prerequisites
 
-The environment variable `GOOGLE_APPLICATION_CREDENTIALS` must be set to the account key json file obtained from the [Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts) page in GCP Console.
+The environment variable `GOOGLE_APPLICATION_CREDENTIALS` must be set to the account key json file obtained from the [Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts) page in GCP Console, for terraform to work with it.
+
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/terraform-serviceacc-key.json
+```
+
+Additionally, a storage bucket to sync the state lock is to be created, and updated to enable versioning.
+
+```bash
+gcloud storage buckets create gs://${BUCKET_NAME} \
+  --project=${PROJECT_ID} \
+  --location=${LOCATION} \
+  --uniform-bucket-level-access
+
+gcloud storage buckets update gs://${BUCKET_NAME} \
+  --versioning
+```
+
+Then, terraform's backend must be set to use this bucket:
+
+```hcl
+terraform {
+  backend "gcs" {
+    bucket  = "<BUCKET_NAME>"
+    prefix  = "gke-cluster"
+  }
+}
+```
 
 ### Initialize Terraform
 
@@ -106,6 +133,8 @@ terraform init -backend-config=backend.tf
 ```
 
 ### Plan
+
+Edit the appropriate .tfvars file with valid credentials, then use the path of that file in the `-var-file` flag:
 
 ```bash
 terraform plan -var-file=envs/staging.tfvars -out=tfplan.out
@@ -134,10 +163,12 @@ terraform workspace select staging
 
 ## Environment Deployment
 
+Run the commands while in the `infra` folder.
+
 ### Dev/Staging
 
 ```bash
-terraform init -backend-config=envs/staging.backend.tf
+terraform init -backend-config=backend.tf
 terraform workspace select staging || terraform workspace new staging
 terraform apply -var-file=envs/staging.tfvars
 ```
@@ -147,7 +178,7 @@ terraform apply -var-file=envs/staging.tfvars
 **Only apply from CI with manual approval.**
 
 ```bash
-terraform init -backend-config=envs/prod.backend.tf
+terraform init -backend-config=backend.tf
 terraform workspace select prod || terraform workspace new prod
 terraform apply -var-file=envs/prod.tfvars
 ```
@@ -179,16 +210,36 @@ The `Jenkinsfile` automates:
 
 Secrets (e.g. DB credentials) are stored securely in **GCP Secret Manager**.
 
+To create credentials in secret manager,
+
+```bash
+echo -n '<username>' | gcloud secrets create db-user \                  
+  --replication-policy="automatic" \
+  --data-file=-
+
+echo -n 'super-secure-password' | gcloud secrets create db-password \
+  --replication-policy="automatic" \
+  --data-file=-
+```
+
 Accessed in Terraform using (`data.tf` and `locals.tf`):
 
 ```hcl
 data "google_secret_manager_secret_version" "db_user" {
   secret  = "db-user"
+  project = var.project_id
+  version = "latest"
+}
+
+data "google_secret_manager_secret_version" "db_password" {
+  secret  = "db-password"
+  project = var.project_id
   version = "latest"
 }
 
 locals {
-  db_user = data.google_secret_manager_secret_version.db_user.secret_data
+  db_user     = data.google_secret_manager_secret_version.db_user.secret_data
+  db_password = data.google_secret_manager_secret_version.db_password.secret_data
 }
 ```
 
