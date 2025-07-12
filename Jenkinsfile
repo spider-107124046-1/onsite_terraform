@@ -1,5 +1,5 @@
 pipeline {
-  agent { node { label 'docker' } }
+  agent { node { label 'terraform' } }
 
   environment {
     TF_IN_AUTOMATION = 'true'
@@ -22,65 +22,51 @@ pipeline {
 
   stages {
     stage('Setup tfvars for Respective Branches') {
-      agent {
-        docker {
-          image 'hashicorp/terraform:latest'
-          args '-u root:root'
-          reuseNode true
-        }
-      }
       steps {
         dir('infra') {
-        script {
-          if (env.BRANCH_NAME.startsWith('feature/')) {
-            def tfvars = """
-              project_id        = "spider-107124046-onsite"
-              region            = "asia-south1"
-              cluster_name      = "spider-web-${env.BRANCH_NAME.replaceAll('/', '-')}"
-              node_count        = 1
-              node_machine_type = "e2-micro"
-              network_name      = "spider-web-${env.BRANCH_NAME.replaceAll('/', '-')}-vpc"
+          script {
+            if (env.BRANCH_NAME.startsWith('feature/')) {
+              def tfvars = """
+                project_id        = "spider-107124046-onsite"
+                region            = "asia-south1"
+                cluster_name      = "spider-web-${env.BRANCH_NAME.replaceAll('/', '-')}"
+                node_count        = 1
+                node_machine_type = "e2-micro"
+                network_name      = "spider-web-${env.BRANCH_NAME.replaceAll('/', '-')}-vpc"
 
-              subnets = [
-                {
-                  name          = "subnet-${env.BRANCH_NAME.replaceAll('/', '-')}"
-                  ip_cidr_range = "10.40.0.0/16"
+                subnets = [
+                  {
+                    name          = "subnet-${env.BRANCH_NAME.replaceAll('/', '-')}"
+                    ip_cidr_range = "10.40.0.0/16"
+                  }
+                ]
+
+                db_instance_name = "spider-db-${env.BRANCH_NAME.replaceAll('/', '-')}"
+                db_name          = "classroom_${env.BRANCH_NAME.replaceAll('/', '_')}"
+
+                ssh_allowed_ip_cidr = "0.0.0.0/0"
+
+                buckets = {
+                  "spider-${env.BRANCH_NAME.replaceAll('/', '-')}-uploads" = {
+                    public_access     = true
+                    enable_versioning = false
+                  }
                 }
-              ]
-
-              db_instance_name = "spider-db-${env.BRANCH_NAME.replaceAll('/', '-')}"
-              db_name          = "classroom_${env.BRANCH_NAME.replaceAll('/', '_')}"
-
-              ssh_allowed_ip_cidr = "0.0.0.0/0"
-
-              buckets = {
-                "spider-${env.BRANCH_NAME.replaceAll('/', '-')}-uploads" = {
-                  public_access     = true
-                  enable_versioning = false
-                }
+              """
+              writeFile file: "infra/envs/${env.BRANCH_NAME}.tfvars", text: tfvars
+              env.TF_VAR_FILE = "infra/envs/${env.BRANCH_NAME}.tfvars"
+            } else {
+              withCredentials([file(credentialsId: 'terraform-staging-tfvars', variable: 'TFVARS_FILE')]) {
+                sh 'cp "$TFVARS_FILE" infra/envs/staging.tfvars'
+                env.TF_VAR_FILE = 'infra/envs/staging.tfvars'
               }
-            """
-            writeFile file: "infra/envs/${env.BRANCH_NAME}.tfvars", text: tfvars
-            env.TF_VAR_FILE = "infra/envs/${env.BRANCH_NAME}.tfvars"
-          } else {
-            withCredentials([file(credentialsId: 'terraform-staging-tfvars', variable: 'TFVARS_FILE')]) {
-              sh 'cp "$TFVARS_FILE" infra/envs/staging.tfvars'
-              env.TF_VAR_FILE = 'infra/envs/staging.tfvars'
             }
           }
-        }
         }
       }
     }
 
     stage('Terraform Init') {
-      agent {
-        docker {
-          image 'hashicorp/terraform:latest'
-          args '-u root:root'
-          reuseNode true
-        }
-      }
       steps {
         dir('infra') {
           sh 'terraform init'
@@ -89,13 +75,6 @@ pipeline {
     }
 
     stage('Set Terraform Workspace') {
-      agent {
-        docker {
-          image 'hashicorp/terraform:latest'
-          args '-u root:root'
-          reuseNode true
-        }
-      }
       steps {
         dir('infra') {
           script {
@@ -110,13 +89,6 @@ pipeline {
     }
 
     stage('Terraform Plan') {
-      agent {
-        docker {
-          image 'hashicorp/terraform:latest'
-          args '-u root:root'
-          reuseNode true
-        }
-      }
       steps {
         dir('infra') {
           sh "terraform plan -var-file=${env.TF_VAR_FILE} -out=tfplan.out"
@@ -142,13 +114,6 @@ pipeline {
           expression { return params.AUTO_APPROVE }
         }
       }
-      agent {
-        docker {
-          image 'hashicorp/terraform:latest'
-          args '-u root:root'
-          reuseNode true
-        }
-      }
       steps {
         dir('infra') {
           sh 'terraform apply -auto-approve tfplan.out'
@@ -160,13 +125,6 @@ pipeline {
       when {
         not {
           branch 'main'
-        }
-      }
-      agent {
-        docker {
-          image 'hashicorp/terraform:latest'
-          args '-u root:root'
-          reuseNode true
         }
       }
       steps {
