@@ -22,7 +22,15 @@ pipeline {
 
   stages {
     stage('Setup tfvars for Respective Branches') {
+      agent {
+        docker {
+          image 'hashicorp/terraform:latest'
+          args '-u root:root'
+          reuseNode true
+        }
+      }
       steps {
+        dir('infra') {
         script {
           if (env.BRANCH_NAME.startsWith('feature/')) {
             def tfvars = """
@@ -60,6 +68,7 @@ pipeline {
               env.TF_VAR_FILE = 'infra/envs/staging.tfvars'
             }
           }
+        }
         }
       }
     }
