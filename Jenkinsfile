@@ -26,12 +26,6 @@ pipeline {
   }
 
   stages {
-    stage('Checkout') {
-      steps {
-        checkout scm
-      }
-    }
-
     stage('Setup tfvars for Respective Branches') {
       steps {
         script {
