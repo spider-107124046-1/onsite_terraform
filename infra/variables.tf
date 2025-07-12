@@ -36,13 +36,13 @@ variable "db_password" {
   sensitive = true
 }
 
-variable "bucket_name" {
-  default = "spider-107124046-uploads-bucket"
-}
-variable "bucket_public_access" {
-  default = false
-}
-variable "bucket_versioning" {
-  default = true
+variable "buckets" {
+  type = map(object({
+    public_access     = bool
+    enable_versioning = bool
+  }))
 }
 
+variable "ssh_allowed_ip_cidr" {
+  description = "Your IP address or CIDR block allowed to SSH"
+}

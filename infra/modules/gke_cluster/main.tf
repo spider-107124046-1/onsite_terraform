@@ -24,12 +24,12 @@ resource "google_container_node_pool" "primary_nodes" {
   location   = var.region
   cluster    = google_container_cluster.primary.name
   project    = var.project_id
-  tags       = ["allow-ssh", "allow-http"]
 
   node_count = var.node_count
 
   node_config {
     machine_type = var.node_machine_type
+    tags         = ["allow-ssh"]
 
     oauth_scopes = [
       "https://www.googleapis.com/auth/cloud-platform"

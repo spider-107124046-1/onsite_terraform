@@ -31,11 +31,13 @@ module "db" {
   db_password   = var.db_password
 }
 
-module "uploads_bucket" {
+module "buckets" {
+  for_each = var.buckets
+
   source            = "./modules/cloud_storage"
   project_id        = var.project_id
-  bucket_name       = var.bucket_name
+  bucket_name       = each.key
+  public_access     = each.value.public_access
+  enable_versioning = each.value.enable_versioning
   location          = var.region
-  public_access     = var.bucket_public_access
-  enable_versioning = var.bucket_versioning
 }
