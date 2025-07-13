@@ -1,6 +1,5 @@
 provider "google" {
-  credentials = file("terraform-serviceacc-key.json")
-  project     = "spider-107124046-onsite"
+  project     = var.project_id
   region      = var.region
   zone        = var.zone
 }

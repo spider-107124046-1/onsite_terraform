@@ -8,18 +8,6 @@ module "vpc" {
   ssh_allowed_ip_cidr     = var.ssh_allowed_ip_cidr
 }
 
-module "gke" {
-  source             = "./modules/gke_cluster"
-  project_id         = var.project_id
-  region             = var.region
-  cluster_name       = var.cluster_name
-  node_count         = var.node_count
-  node_machine_type  = var.node_machine_type
-
-  network            = module.vpc.network
-  subnetwork         = module.vpc.subnets[0]
-}
-
 module "db" {
   source        = "./modules/cloud_sql"
   project_id    = var.project_id
@@ -32,12 +20,16 @@ module "db" {
 }
 
 module "buckets" {
-  for_each = var.buckets
+  source     = "./modules/cloud_storage"
+  project_id = var.project_id
+  buckets    = var.buckets
+}
 
-  source            = "./modules/cloud_storage"
-  project_id        = var.project_id
-  bucket_name       = each.key
-  public_access     = each.value.public_access
-  enable_versioning = each.value.enable_versioning
-  location          = var.region
+module "compute_vms" {
+  source     = "./modules/compute_vms"
+  project_id = var.project_id
+  network    = module.vpc.network_self_link
+  subnetwork = module.vpc.subnet_self_links[0]
+
+  instances = var.instances
 }

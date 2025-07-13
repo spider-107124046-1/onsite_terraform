@@ -1,8 +1,5 @@
 project_id        = "spider-107124046-onsite"
 region            = "asia-south1"
-cluster_name      = "spider-web-dev"
-node_count        = 1
-node_machine_type = "e2-micro"
 network_name      = "spider-web-dev-vpc"
 
 subnets = [
@@ -17,9 +14,34 @@ db_name          = "classroom_dev"
 
 ssh_allowed_ip_cidr = "0.0.0.0/0" # WARNING: Dev environment only
 
+# Modularity: Multiple buckets can be defined here and all of them will be
+# created on applying terraform plan
 buckets = {
   "spider-web-dev-uploads" = {
     public_access     = true
     enable_versioning = false
+    location          = "ASIA-SOUTH1"
+  }
+}
+
+instances = {
+  "app-server" = {
+    name         = "app-server"
+    machine_type = "e2-micro"
+    zone         = "asia-south1-b"
+    subnetwork   = "subnet-1"
+    tags         = ["allow-ssh"]
+
+    metadata = {
+      startup-script = "" # Add script here if needed
+    }
+
+    boot_disk = {
+      initialize_params = {
+        image = "debian-cloud/debian-12"
+        size  = 10
+        type  = "pd-balanced"
+      }
+    }
   }
 }

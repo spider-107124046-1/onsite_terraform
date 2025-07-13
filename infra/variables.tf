@@ -1,19 +1,6 @@
 variable "project_id" {}
-variable "region" {
-  default = "us-central1"
-}
-variable "zone" {
-  default = "us-central1-a"
-}
-variable "cluster_name" {
-  default = "spider-web-107124046"
-}
-variable "node_count" {
-  default = 1
-}
-variable "node_machine_type" {
-  default = "e2-micro"
-}
+variable "region" {}
+variable "zone" {}
 
 variable "network_name" {
   default = "spider-web-107124046-vpc"
@@ -37,6 +24,26 @@ variable "buckets" {
   type = map(object({
     public_access     = bool
     enable_versioning = bool
+    location          = string
+  }))
+}
+
+variable "instances" {
+  description = "Map of instance configurations"
+  type = map(object({
+    name         = string
+    machine_type = string
+    zone         = string
+    subnetwork   = string
+    tags         = list(string)
+    metadata     = map(string)
+    boot_disk = object({
+      initialize_params = object({
+        image = string
+        size  = number
+        type  = string
+      })
+    })
   }))
 }
 

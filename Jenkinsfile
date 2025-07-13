@@ -4,7 +4,6 @@ pipeline {
   environment {
     TF_IN_AUTOMATION = 'true'
     GOOGLE_APPLICATION_CREDENTIALS = credentials('gcp-spider-service-account')
-    def safeBranchName = env.BRANCH_NAME.replaceAll('/', '-')
   }
 
   options {
@@ -26,29 +25,31 @@ pipeline {
       steps {
         dir('infra') {
           script {
+            env.SAFE_BRANCH_NAME = env.BRANCH_NAME?.replaceAll('/', '-') ?: 'default'
+            echo "Using SAFE_BRANCH_NAME=${env.SAFE_BRANCH_NAME}"
             if (env.BRANCH_NAME.startsWith('feature/')) {
               def tfvars = """
                 project_id        = "spider-107124046-onsite"
                 region            = "asia-south1"
-                cluster_name      = "spider-web-${env.BRANCH_NAME.replaceAll('/', '-')}"
+                cluster_name      = "spider-web-${env.SAFE_BRANCH_NAME}"
                 node_count        = 1
                 node_machine_type = "e2-micro"
-                network_name      = "spider-web-${env.BRANCH_NAME.replaceAll('/', '-')}-vpc"
+                network_name      = "spider-web-${env.SAFE_BRANCH_NAME}-vpc"
 
                 subnets = [
                   {
-                    name          = "subnet-${env.BRANCH_NAME.replaceAll('/', '-')}"
+                    name          = "subnet-${env.SAFE_BRANCH_NAME}"
                     ip_cidr_range = "10.40.0.0/16"
                   }
                 ]
 
-                db_instance_name = "spider-db-${env.BRANCH_NAME.replaceAll('/', '-')}"
-                db_name          = "classroom_${env.BRANCH_NAME.replaceAll('/', '_')}"
+                db_instance_name = "spider-db-${env.SAFE_BRANCH_NAME}"
+                db_name          = "classroom_${env.SAFE_BRANCH_NAME}"
 
                 ssh_allowed_ip_cidr = "0.0.0.0/0"
 
                 buckets = {
-                  "spider-${env.BRANCH_NAME.replaceAll('/', '-')}-uploads" = {
+                  "spider-${env.SAFE_BRANCH_NAME}-uploads" = {
                     public_access     = true
                     enable_versioning = false
                   }
@@ -75,7 +76,7 @@ pipeline {
       steps {
         dir('infra') {
           script {
-            def workName = env.SAFE_BRANCH_NAME ? env.SAFE_BRANCH_NAME : 'default'
+            def workName = env.SAFE_BRANCH_NAME
             sh "terraform workspace new '${workName}' || terraform workspace select '${workName}'"
             sh "terraform workspace show"
           }
@@ -89,10 +90,10 @@ pipeline {
           script {
             if (env.BRANCH_NAME.startsWith('feature/')) {
               env.TFVARS_FILE = "envs/${env.SAFE_BRANCH_NAME}.tfvars"
-              sh "terraform plan -var-file=${env.TFVARS_FILE} -out=tfplan.out"
+              sh "terraform plan -var-file=$TFVARS_FILE -out=tfplan.out"
             } else {
               withCredentials([file(credentialsId: 'terraform-staging-tfvars', variable: 'TFVARS_FILE')]) {
-                sh "terraform plan -var-file=${env.TFVARS_FILE} -out=tfplan.out"
+                sh "terraform plan -var-file=$TFVARS_FILE -out=tfplan.out"
               }
             }
           }
@@ -148,7 +149,7 @@ pipeline {
       echo "Cleaning up Terraform workspace"
       dir('infra') {
         script {
-          def ws = env.SAFE_BRANCH_NAME ? env.SAFE_BRANCH_NAME : 'default'
+          def ws = env.SAFE_BRANCH_NAME
           sh 'terraform workspace select default || true'
           sh "terraform workspace delete ${ws} || true"
         }

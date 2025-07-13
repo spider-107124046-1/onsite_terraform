@@ -1,7 +1,7 @@
-output "bucket_name" {
-  value = google_storage_bucket.bucket.name
-}
-
-output "bucket_url" {
-  value = "https://storage.googleapis.com/${google_storage_bucket.bucket.name}"
+output "bucket_urls" {
+  description = "URLs of each Bucket which can be referenced by name"
+  value = {
+    for name, res in google_storage_bucket.bucket :
+    name => "gs://${res.name}"
+  }
 }

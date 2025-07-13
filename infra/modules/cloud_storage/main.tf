@@ -1,20 +1,24 @@
 resource "google_storage_bucket" "bucket" {
-  name          = var.bucket_name
+  for_each      = var.buckets
+
+  name          = each.key
   project       = var.project_id
-  location      = var.location
-  force_destroy = false # if true, allows deletion even if not empty
+  location      = each.value.location
+  force_destroy = false
 
   versioning {
-    enabled = var.enable_versioning
+    enabled = each.value.enable_versioning
   }
 
   uniform_bucket_level_access = true
 }
 
 resource "google_storage_bucket_iam_member" "public" {
-  count  = var.public_access ? 1 : 0
-  bucket = google_storage_bucket.bucket.name
+  for_each = {
+    for k, v in var.buckets : k => v if v.public_access
+  }
 
+  bucket = google_storage_bucket.bucket[each.key].name
   role   = "roles/storage.objectViewer"
   member = "allUsers"
 }
