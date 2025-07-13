@@ -28,8 +28,7 @@ module "buckets" {
 module "compute_vms" {
   source     = "./modules/compute_vms"
   project_id = var.project_id
-  network    = module.vpc.network_self_link
-  subnetwork = module.vpc.subnet_self_links[0]
+  subnet_self_links = module.vpc.subnet_self_links
 
   instances = var.instances
 }

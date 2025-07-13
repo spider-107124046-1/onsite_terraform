@@ -13,7 +13,10 @@ output "subnets" {
 }
 
 output "subnet_self_links" {
-  description = "Self links of the subnets"
-  value = [for subnet in google_compute_subnetwork.subnets : subnet.self_link]
+  description = "Map of subnet name to subnet self-links"
+  value = {
+    for name, subnet in google_compute_subnetwork.subnets :
+    name => subnet.self_link
+  }
 }
 

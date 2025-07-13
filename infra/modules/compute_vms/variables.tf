@@ -1,6 +1,9 @@
 variable "project_id" {}
-variable "network" {}
-variable "subnetwork" {}
+
+variable "subnet_self_links" {
+  description = "Map of subnet name to subnet self-link"
+  type        = map(string)
+}
 
 variable "instances" {
   description = "Map of instance configurations"
