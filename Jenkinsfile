@@ -126,8 +126,9 @@ pipeline {
     stage('Terraform Apply') {
       when {
         anyOf {
-          branch 'develop'
+          branch 'staging'
           branch 'main'
+          branch 'prod'
           expression { return params.AUTO_APPROVE }
         }
       }
