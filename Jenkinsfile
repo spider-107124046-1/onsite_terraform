@@ -21,17 +21,6 @@ pipeline {
   }
 
   stages {
-    stage('Check Skip') {
-      when {
-        not {
-          anyOf {
-            changelog '[ci skip]'
-            changelog '[skip ci]'
-            changelog '\\[ci-skip\\]'
-          }
-        }
-      }
-    }
     stage('Setup tfvars for Respective Branches') {
       steps {
         dir('infra') {
