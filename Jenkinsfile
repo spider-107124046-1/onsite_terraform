@@ -91,10 +91,22 @@ pipeline {
             if (env.BRANCH_NAME.startsWith('feature/')) {
               env.TFVARS_FILE = "envs/${env.SAFE_BRANCH_NAME}.tfvars"
               sh "terraform plan -var-file=$TFVARS_FILE -out=tfplan.out"
-            } else {
+            } else if (env.BRANCH_NAME == 'main' || env.BRANCH_NAME == 'prod') {
+              withCredentials([file(credentialsId: 'terraform-prod-tfvars', variable: 'TFVARS_FILE')]) {
+                sh "terraform plan -var-file=$TFVARS_FILE -out=tfplan.out"
+              }
+            } else if (env.BRANCH_NAME == 'develop') {
+              withCredentials([file(credentialsId: 'terraform-develop-tfvars', variable: 'TFVARS_FILE')]) {
+                sh "terraform plan -var-file=$TFVARS_FILE -out=tfplan.out"
+              }
+            } else if (env.BRANCH_NAME == 'staging') {
               withCredentials([file(credentialsId: 'terraform-staging-tfvars', variable: 'TFVARS_FILE')]) {
                 sh "terraform plan -var-file=$TFVARS_FILE -out=tfplan.out"
               }
+            } else {
+              currentBuild.result = 'ABORTED'
+              error "Unsupported branch: ${env.BRANCH_NAME}. Skipping pipeline"
+              return
             }
           }
         }
