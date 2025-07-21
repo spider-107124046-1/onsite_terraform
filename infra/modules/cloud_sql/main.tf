@@ -4,6 +4,10 @@ resource "google_sql_database_instance" "default" {
   region           = var.region
   database_version = var.database_version
 
+  lifecycle {
+    prevent_destroy = true
+  }
+
   settings {
     tier    = var.tier
     edition = var.edition
